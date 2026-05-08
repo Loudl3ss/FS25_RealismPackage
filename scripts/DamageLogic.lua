@@ -460,42 +460,67 @@ function DamageLogic:onUpdate(dt)
     if self.isServer then
         processFallbackSpeedImpact(self, damageState, dt)
 
-        -- Limit speed to 5 km/h if fully damaged, restore otherwise
-        local drivable = self.spec_drivable or self
-        if damageState.totalDamage >= 1 then
-            -- Save original speed limit if not already saved
-            if drivable._rpOrigSpeedLimit == nil then
-                drivable._rpOrigSpeedLimit = drivable.speedLimit or (drivable.spec_drivable and drivable.spec_drivable.speedLimit)
+        -- Hard-limit speed and torque when fully damaged; restore when repaired
+        local drivable = self.spec_drivable
+        local gameDamage = self.getDamageAmount ~= nil and (self:getDamageAmount() or 0) or 0
+
+        if damageState.totalDamage >= 1 or gameDamage >= 1 then
+
+            -- Save original values once
+            if self._rpBrokenState == nil then
+                self._rpBrokenState = {
+                    speedLimit = drivable and drivable.speedLimit or nil
+                }
+                print("[RealismPackage] Vehicle entered critical damage state")
             end
-            if drivable.spec_drivable ~= nil then
-                drivable.spec_drivable.speedLimit = 5
+
+            -- Hard speed limit
+            if drivable ~= nil then
+                drivable.speedLimit = 5
             end
-            drivable.speedLimit = 5
+
+            -- Kill engine torque/power (no-op if API unavailable, harmless)
             if self.setPowerMultiplier ~= nil then
-                local speedKmh = 0
-                if self.getLastSpeed ~= nil then
-                    speedKmh = (self:getLastSpeed() or 0) * 3600
-                elseif type(self.lastSpeed) == "number" then
-                    speedKmh = math.max(0, self.lastSpeed) * 3600
+                self:setPowerMultiplier(0.01, true)
+            end
+
+            -- Force low speed via motor fields
+            if self.spec_motorized ~= nil and self.spec_motorized.motor ~= nil then
+                local motor = self.spec_motorized.motor
+
+                if motor.peakMotorTorque ~= nil then
+                    motor.peakMotorTorque = 5
                 end
-                if speedKmh > 5 then
-                    self:setPowerMultiplier(0.01, true)
-                else
-                    self:setPowerMultiplier(0.08, true)
+
+                if type(motor.maxForwardSpeed) == "number" then
+                    -- maxForwardSpeed is in m/s; 5 km/h = 1.39 m/s
+                    motor.maxForwardSpeed = 5 / 3.6
                 end
             end
+
+            -- Stop PTO / heavy attached tools
+            if self.spec_powerConsumer ~= nil then
+                self.spec_powerConsumer.requiredPower = 999999
+            end
+
         else
-            -- Restore original speed limit if it was changed
-            if drivable._rpOrigSpeedLimit ~= nil then
-                if drivable.spec_drivable ~= nil then
-                    drivable.spec_drivable.speedLimit = drivable._rpOrigSpeedLimit
+
+            -- Restore vehicle to normal when damage drops below 100%
+            if self._rpBrokenState ~= nil then
+                print("[RealismPackage] Vehicle restored from critical damage")
+
+                if drivable ~= nil and self._rpBrokenState.speedLimit ~= nil then
+                    drivable.speedLimit = self._rpBrokenState.speedLimit
                 end
-                drivable.speedLimit = drivable._rpOrigSpeedLimit
-                drivable._rpOrigSpeedLimit = nil
+
+                if self.setPowerMultiplier ~= nil then
+                    self:setPowerMultiplier(1, true)
+                end
+
+                self._rpBrokenState = nil
             end
-            if self.setPowerMultiplier ~= nil then
-                self:setPowerMultiplier(1, true)
-            end
+
+            -- Graduated penalty (< 100% damage) is handled by AirFilterSystem.applyEngineImpact below
         end
 
         local stateChanged = false

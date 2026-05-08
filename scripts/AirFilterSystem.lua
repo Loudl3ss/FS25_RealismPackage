@@ -109,42 +109,57 @@ end
 
 function airFilterSystem.applyEngineImpact(vehicle, state, context)
     local settings = context ~= nil and context.getModSettings ~= nil and context.getModSettings() or {}
-    local motorized = vehicle ~= nil and vehicle.getMotor ~= nil and vehicle:getMotor() or nil
+    local motor = vehicle ~= nil and vehicle.spec_motorized ~= nil and vehicle.spec_motorized.motor or nil
 
-    if motorized == nil or motorized.setPowerMultiplier == nil then
+    -- motor.maxForwardSpeed (m/s) is the reliable Giants API field for capping vehicle speed
+    if motor == nil or type(motor.maxForwardSpeed) ~= "number" then
         return false
     end
 
-    local shouldApplyPenalty = false
-    local airFilterPenaltyMultiplier = 1
-    local damagePenaltyMultiplier = 1
+    -- Always derive the original speed from the saved value, never from the current
+    -- motor.maxForwardSpeed which may already be reduced — this prevents a feedback spiral
+    -- where each frame treats the already-penalised speed as the new baseline.
+    local originalSpeedMs = state.airFilterPowerPenaltyApplied
+        and type(state.airFilterPreviousPowerMultiplier) == "number"
+        and state.airFilterPreviousPowerMultiplier
+        or motor.maxForwardSpeed
+    local originalTopSpeedKmh = math.max(1, originalSpeedMs * 3.6)
 
+    -- Air filter penalty (kicks in below 20% condition)
+    local airFilterPenaltyMultiplier = 1
     if settings.airFilterEnabled ~= false and state.airFilterCondition < 0.2 then
         airFilterPenaltyMultiplier = 0.8
-        shouldApplyPenalty = true
     end
 
+    -- Damage penalty computed against original top speed, not the current (possibly reduced) one
+    local damagePenaltyMultiplier = 1
     if settings.damageEnabled ~= false then
-        damagePenaltyMultiplier = getDamagePenaltyMultiplier(vehicle, context)
+        local impactConfig = context ~= nil and context.damageEngineImpact or nil
+        local damageAmount = vehicle.getDamageAmount ~= nil and (vehicle:getDamageAmount() or 0) or 0
+        local startAtDamage = impactConfig ~= nil and impactConfig.START_AT_DAMAGE or 0.15
 
-        if damagePenaltyMultiplier < 0.9999 then
-            shouldApplyPenalty = true
+        if damageAmount > startAtDamage then
+            local targetSpeedKmh = impactConfig ~= nil and impactConfig.FULL_DAMAGE_TARGET_SPEED_KMH or 5
+            local minimumFloor = impactConfig ~= nil and impactConfig.MIN_POWER_MULTIPLIER_FLOOR or 0.03
+            local minimumPowerMultiplier = math.max(minimumFloor, math.min(1, targetSpeedKmh / originalTopSpeedKmh))
+            local normalizedDamage = (damageAmount - startAtDamage) / math.max(0.0001, 1 - startAtDamage)
+            damagePenaltyMultiplier = math.max(minimumPowerMultiplier, 1 - (normalizedDamage * (1 - minimumPowerMultiplier)))
         end
     end
+
+    local speedMultiplier = airFilterPenaltyMultiplier * damagePenaltyMultiplier
+    local shouldApplyPenalty = speedMultiplier < 0.9999
 
     if shouldApplyPenalty then
         if not state.airFilterPowerPenaltyApplied then
-            state.airFilterPreviousPowerMultiplier = motorized.getPowerMultiplier ~= nil
-                and (motorized:getPowerMultiplier() or 1)
-                or 1
+            state.airFilterPreviousPowerMultiplier = originalSpeedMs
             state.airFilterPowerPenaltyApplied = true
         end
 
-        local targetMultiplier = math.max(0, (state.airFilterPreviousPowerMultiplier or 1) * airFilterPenaltyMultiplier * damagePenaltyMultiplier)
-        local currentMultiplier = motorized.getPowerMultiplier ~= nil and (motorized:getPowerMultiplier() or 1) or nil
+        local targetSpeedMs = math.max(originalSpeedMs * speedMultiplier, 5 / 3.6)
 
-        if currentMultiplier == nil or math.abs(currentMultiplier - targetMultiplier) > 0.0001 then
-            motorized:setPowerMultiplier(targetMultiplier)
+        if math.abs(motor.maxForwardSpeed - targetSpeedMs) > 0.001 then
+            motor.maxForwardSpeed = targetSpeedMs
             return true
         end
 
@@ -152,7 +167,7 @@ function airFilterSystem.applyEngineImpact(vehicle, state, context)
     end
 
     if state.airFilterPowerPenaltyApplied then
-        motorized:setPowerMultiplier(math.max(0, state.airFilterPreviousPowerMultiplier or 1))
+        motor.maxForwardSpeed = state.airFilterPreviousPowerMultiplier
         state.airFilterPowerPenaltyApplied = false
         state.airFilterPreviousPowerMultiplier = 1
         return true
@@ -202,11 +217,14 @@ function airFilterSystem.clean(vehicle, state, context)
 end
 
 function airFilterSystem.resetEngineImpact(vehicle, state, context)
-    local resetState = {
-        airFilterCondition = 1,
-        airFilterPowerPenaltyApplied = state.airFilterPowerPenaltyApplied,
-        airFilterPreviousPowerMultiplier = state.airFilterPreviousPowerMultiplier
-    }
+    if not state.airFilterPowerPenaltyApplied then return end
 
-    airFilterSystem.applyEngineImpact(vehicle, resetState, context)
+    local motor = vehicle ~= nil and vehicle.spec_motorized ~= nil and vehicle.spec_motorized.motor or nil
+
+    if motor ~= nil and type(state.airFilterPreviousPowerMultiplier) == "number" then
+        motor.maxForwardSpeed = state.airFilterPreviousPowerMultiplier
+    end
+
+    state.airFilterPowerPenaltyApplied = false
+    state.airFilterPreviousPowerMultiplier = 1
 end
