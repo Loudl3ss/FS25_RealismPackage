@@ -462,7 +462,8 @@ function DamageLogic:onUpdate(dt)
 
         -- Limit speed to 5 km/h if fully damaged, restore otherwise
         local drivable = self.spec_drivable or self
-        if damageState.totalDamage >= 1 then
+        local gameDamage = self.getDamageAmount ~= nil and (self:getDamageAmount() or 0) or 0
+        if damageState.totalDamage >= 1 or gameDamage >= 1 then
             -- Save original speed limit if not already saved
             if drivable._rpOrigSpeedLimit == nil then
                 drivable._rpOrigSpeedLimit = drivable.speedLimit or (drivable.spec_drivable and drivable.spec_drivable.speedLimit)
@@ -493,9 +494,8 @@ function DamageLogic:onUpdate(dt)
                 drivable.speedLimit = drivable._rpOrigSpeedLimit
                 drivable._rpOrigSpeedLimit = nil
             end
-            if self.setPowerMultiplier ~= nil then
-                self:setPowerMultiplier(1, true)
-            end
+            -- Power multiplier is managed by AirFilterSystem.applyEngineImpact below;
+            -- do NOT reset it here or the graduated damage penalty is overwritten every frame.
         end
 
         local stateChanged = false
