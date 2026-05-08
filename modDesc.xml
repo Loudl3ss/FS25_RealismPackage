@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<modDesc descVersion="108">
+    <author>Loudless</author>
+    <version>1.0.0.0</version>
+    <title>
+        <en>Realism Package</en>
+            </title>
+    <description>
+        <en>Advanced maintenance system</en>
+    </description>
+<iconFilename>icon.dds</iconFilename>
+
+
+    <extraSourceFiles>
+        <sourceFile filename="scripts/RealismPackage.lua" />
+        <sourceFile filename="scripts/DamageLogic.lua" />
+        <sourceFile filename="scripts/WearSystem.lua" />
+        <sourceFile filename="scripts/AirFilterSystem.lua" />
+        <sourceFile filename="scripts/RealismWorkshopActionEvent.lua" />
+        <sourceFile filename="scripts/RealismWorkshopActions.lua" />
+        <sourceFile filename="scripts/RealismSettingsEvent.lua" />
+        <sourceFile filename="scripts/RealismSettings.lua" />
+    </extraSourceFiles>
+<l10n>      
+        <text name="input_RP_WORKSHOP_FULL_SERVICE">
+            <en>Full Service</en>
+        </text>
+        <text name="input_RP_WORKSHOP_CLEAN_FILTER">
+            <en>Clean Air Filter</en>
+        </text>
+        <text name="rp_workshop_confirm_full_service">
+            <en>Do full service on this vehicle for %s?</en>
+        </text>
+        <text name="rp_workshop_confirm_clean_filter">
+            <en>Clean air filter on this vehicle for %s?</en>
+        </text>
+        <text name="rp_settings_title">
+            <en>Realism Package</en>
+        </text>
+        <text name="rp_settings_profile_title">
+            <en>Maintenance Profile</en>
+        </text>
+        <text name="rp_settings_profile_desc">
+            <en>Select how strict maintenance intervals are.</en>
+        </text>
+        <text name="rp_settings_profile_fs25">
+            <en>FS25</en>
+        </text>
+        <text name="rp_settings_profile_normal">
+            <en>Normal</en>
+        </text>
+        <text name="rp_settings_profile_real_life">
+            <en>Real Life</en>
+        </text>
+        <text name="rp_settings_wear_enabled_title">
+            <en>Wear System</en>
+        </text>
+        <text name="rp_settings_wear_enabled_desc">
+            <en>Enable custom service wear simulation.</en>
+        </text>
+        <text name="rp_settings_damage_enabled_title">
+            <en>Collision Damage</en>
+        </text>
+        <text name="rp_settings_damage_enabled_desc">
+            <en>Enable collision damage scaling.</en>
+        </text>
+        <text name="rp_settings_air_filter_enabled_title">
+            <en>Air Filter System</en>
+        </text>
+        <text name="rp_settings_air_filter_enabled_desc">
+            <en>Enable air filter wear and engine impact.</en>
+        </text>
+        <text name="rp_settings_option_off">
+            <en>Off</en>
+        </text>
+        <text name="rp_settings_option_on">
+            <en>On</en>
+        </text>
+    </l10n>
+</modDesc>
