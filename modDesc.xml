@@ -76,5 +76,11 @@
         <text name="rp_settings_option_on">
             <en>On</en>
         </text>
+        <text name="infohud_rpWear">
+            <en>Wear</en>
+        </text>
+        <text name="infohud_rpAirFilter">
+            <en>Air Filter</en>
+        </text>
     </l10n>
 </modDesc>
