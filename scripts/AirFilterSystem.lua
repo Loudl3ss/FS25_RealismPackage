@@ -109,9 +109,9 @@ end
 
 function airFilterSystem.applyEngineImpact(vehicle, state, context)
     local settings = context ~= nil and context.getModSettings ~= nil and context.getModSettings() or {}
-    local motorized = vehicle ~= nil and vehicle.getMotor ~= nil and vehicle:getMotor() or nil
 
-    if motorized == nil or motorized.setPowerMultiplier == nil then
+    -- setPowerMultiplier is on the vehicle (spec_motorized), NOT on the motor object returned by getMotor()
+    if vehicle == nil or vehicle.setPowerMultiplier == nil then
         return false
     end
 
@@ -134,17 +134,17 @@ function airFilterSystem.applyEngineImpact(vehicle, state, context)
 
     if shouldApplyPenalty then
         if not state.airFilterPowerPenaltyApplied then
-            state.airFilterPreviousPowerMultiplier = motorized.getPowerMultiplier ~= nil
-                and (motorized:getPowerMultiplier() or 1)
+            state.airFilterPreviousPowerMultiplier = vehicle.getPowerMultiplier ~= nil
+                and (vehicle:getPowerMultiplier() or 1)
                 or 1
             state.airFilterPowerPenaltyApplied = true
         end
 
         local targetMultiplier = math.max(0, (state.airFilterPreviousPowerMultiplier or 1) * airFilterPenaltyMultiplier * damagePenaltyMultiplier)
-        local currentMultiplier = motorized.getPowerMultiplier ~= nil and (motorized:getPowerMultiplier() or 1) or nil
+        local currentMultiplier = vehicle.getPowerMultiplier ~= nil and (vehicle:getPowerMultiplier() or 1) or nil
 
         if currentMultiplier == nil or math.abs(currentMultiplier - targetMultiplier) > 0.0001 then
-            motorized:setPowerMultiplier(targetMultiplier)
+            vehicle:setPowerMultiplier(targetMultiplier)
             return true
         end
 
@@ -152,7 +152,7 @@ function airFilterSystem.applyEngineImpact(vehicle, state, context)
     end
 
     if state.airFilterPowerPenaltyApplied then
-        motorized:setPowerMultiplier(math.max(0, state.airFilterPreviousPowerMultiplier or 1))
+        vehicle:setPowerMultiplier(math.max(0, state.airFilterPreviousPowerMultiplier or 1))
         state.airFilterPowerPenaltyApplied = false
         state.airFilterPreviousPowerMultiplier = 1
         return true
