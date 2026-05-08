@@ -472,19 +472,7 @@ function DamageLogic:onUpdate(dt)
                 drivable.spec_drivable.speedLimit = 5
             end
             drivable.speedLimit = 5
-            if self.setPowerMultiplier ~= nil then
-                local speedKmh = 0
-                if self.getLastSpeed ~= nil then
-                    speedKmh = (self:getLastSpeed() or 0) * 3600
-                elseif type(self.lastSpeed) == "number" then
-                    speedKmh = math.max(0, self.lastSpeed) * 3600
-                end
-                if speedKmh > 5 then
-                    self:setPowerMultiplier(0.01, true)
-                else
-                    self:setPowerMultiplier(0.08, true)
-                end
-            end
+            -- motor.maxForwardSpeed hard cap is handled by AirFilterSystem.applyEngineImpact below
         else
             -- Restore original speed limit if it was changed
             if drivable._rpOrigSpeedLimit ~= nil then
