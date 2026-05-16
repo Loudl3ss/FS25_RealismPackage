@@ -4,12 +4,11 @@
     <version>1.0.0.0</version>
     <title>
         <en>Realism Package</en>
-            </title>
+    </title>
     <description>
-        <en>Advanced maintenance system</en>
+        <en>Adds realistic vehicle maintenance, wear, and damage mechanics. Features include: an advanced wear system requiring regular servicing, collision damage that scales with impact intensity, air filter degradation affecting engine performance, and in-game settings to control difficulty. Choose between three maintenance profiles (FS25, Normal, Real Life) and service your fleet through two workshop actions: Full Service and Clean Air Filter. Full multiplayer support with synchronized settings and workshop actions. For complete information, see the README file included with the mod. Report bugs on GitHub: https://github.com/Loudl3ss/FS25_RealismPackage/issues</en>
     </description>
-<iconFilename>icon.dds</iconFilename>
-
+    <iconFilename>icon.dds</iconFilename>
 
     <extraSourceFiles>
         <sourceFile filename="scripts/RealismPackage.lua" />
@@ -21,7 +20,7 @@
         <sourceFile filename="scripts/RealismSettingsEvent.lua" />
         <sourceFile filename="scripts/RealismSettings.lua" />
     </extraSourceFiles>
-<l10n>      
+    <l10n>      
         <text name="input_RP_WORKSHOP_FULL_SERVICE">
             <en>Full Service</en>
         </text>
