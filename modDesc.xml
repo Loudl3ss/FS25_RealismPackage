@@ -21,6 +21,10 @@
         <sourceFile filename="scripts/RealismSettingsEvent.lua" />
         <sourceFile filename="scripts/RealismSettings.lua" />
     </extraSourceFiles>
+    <inputBinding>
+        <actionBinding action="RP_WORKSHOP_FULL_SERVICE" category="MENU" axisType="HALF" />
+        <actionBinding action="RP_WORKSHOP_CLEAN_FILTER" category="MENU" axisType="HALF" />
+    </inputBinding>
 <l10n>      
         <text name="input_RP_WORKSHOP_FULL_SERVICE">
             <en>Full Service</en>
