@@ -8,6 +8,23 @@ InitEventClass(RealismWorkshopActionEvent, "RealismWorkshopActionEvent")
 RealismWorkshopActionEvent.ACTION_FULL_SERVICE = 1
 RealismWorkshopActionEvent.ACTION_CLEAN_AIR_FILTER = 2
 
+local function isValidActionType(actionType)
+    return actionType == RealismWorkshopActionEvent.ACTION_FULL_SERVICE
+        or actionType == RealismWorkshopActionEvent.ACTION_CLEAN_AIR_FILTER
+end
+
+local function getConnectionFarmId(connection)
+    if connection ~= nil and connection.getFarmId ~= nil then
+        local farmId = connection:getFarmId()
+
+        if type(farmId) == "number" then
+            return farmId
+        end
+    end
+
+    return nil
+end
+
 function RealismWorkshopActionEvent.emptyNew()
     return Event.new(RealismWorkshopActionEvent_mt)
 end
@@ -35,6 +52,10 @@ function RealismWorkshopActionEvent.run(self, connection)
     local isServerSide = g_server ~= nil
 
     if isServerSide and self.vehicle ~= nil then
+        if not isValidActionType(self.actionType) then
+            return
+        end
+
         local actionCost = 0
 
         if self.vehicle.getWorkshopActionCost ~= nil then
@@ -42,6 +63,12 @@ function RealismWorkshopActionEvent.run(self, connection)
         end
 
         local farmId = self.vehicle.getOwnerFarmId ~= nil and self.vehicle:getOwnerFarmId() or 0
+        local senderFarmId = getConnectionFarmId(connection)
+
+        if senderFarmId ~= nil and senderFarmId ~= 0 and farmId ~= 0 and senderFarmId ~= farmId then
+            return
+        end
+
         local availableMoney = 0
 
         if g_currentMission ~= nil and g_currentMission.getMoney ~= nil then

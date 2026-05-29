@@ -14,6 +14,9 @@ RP.damageSystem = DamageLogic
 local damageLogic = RP.damageLogic
 
 local damageByVehicle = setmetatable({}, { __mode = "k" })
+local isConsoleCommandRegistered = false
+local isVehicleShowInfoHookInstalled = false
+local isVehicleShowInfoHookWarningLogged = false
 
 damageLogic.PROFILES = {
     REAL_LIFE = {
@@ -212,6 +215,57 @@ local function forceStopEngine(vehicle)
     elseif vehicle.stopMotor ~= nil then
         vehicle:stopMotor()
     end
+end
+
+local function installVehicleShowInfoHook()
+    if Utils ~= nil and type(Utils.appendedFunction) == "function" and DamageLogic and type(DamageLogic.injVehicleShowInfo) == "function" then
+        if Vehicle ~= nil and type(Vehicle.showInfo) == "function" and not Vehicle._rpShowInfoHooked then
+            Vehicle.showInfo = Utils.appendedFunction(Vehicle.showInfo, DamageLogic.injVehicleShowInfo)
+            Vehicle._rpShowInfoHooked = true
+        end
+
+        isVehicleShowInfoHookInstalled = Vehicle ~= nil and Vehicle._rpShowInfoHooked == true
+        return isVehicleShowInfoHookInstalled
+    end
+
+    isVehicleShowInfoHookInstalled = false
+    return false
+end
+
+local function restoreCriticalDamageOverrides(vehicle)
+    local brokenState = vehicle ~= nil and vehicle._rpBrokenState or nil
+
+    if brokenState == nil then
+        return false
+    end
+
+    local drivable = vehicle.spec_drivable
+    if drivable ~= nil and brokenState.speedLimit ~= nil then
+        drivable.speedLimit = brokenState.speedLimit
+    end
+
+    if vehicle.setPowerMultiplier ~= nil then
+        vehicle:setPowerMultiplier(1, true)
+    end
+
+    local motor = vehicle.spec_motorized ~= nil and vehicle.spec_motorized.motor or nil
+    if motor ~= nil then
+        if brokenState.peakMotorTorque ~= nil then
+            motor.peakMotorTorque = brokenState.peakMotorTorque
+        end
+
+        if brokenState.maxForwardSpeed ~= nil then
+            motor.maxForwardSpeed = brokenState.maxForwardSpeed
+        end
+    end
+
+    local powerConsumer = vehicle.spec_powerConsumer
+    if powerConsumer ~= nil and brokenState.requiredPower ~= nil then
+        powerConsumer.requiredPower = brokenState.requiredPower
+    end
+
+    vehicle._rpBrokenState = nil
+    return true
 end
 
 local function getVehicleSpeedKmh(vehicle)
@@ -418,6 +472,8 @@ function DamageLogic:onDelete()
 
         damageByVehicle[self] = nil
     end
+
+    restoreCriticalDamageOverrides(self)
 end
 
 function DamageLogic:onCollision(...)
@@ -469,7 +525,10 @@ function DamageLogic:onUpdate(dt)
             -- Save original values once
             if self._rpBrokenState == nil then
                 self._rpBrokenState = {
-                    speedLimit = drivable and drivable.speedLimit or nil
+                    speedLimit = drivable and drivable.speedLimit or nil,
+                    requiredPower = self.spec_powerConsumer ~= nil and self.spec_powerConsumer.requiredPower or nil,
+                    peakMotorTorque = self.spec_motorized ~= nil and self.spec_motorized.motor ~= nil and self.spec_motorized.motor.peakMotorTorque or nil,
+                    maxForwardSpeed = self.spec_motorized ~= nil and self.spec_motorized.motor ~= nil and self.spec_motorized.motor.maxForwardSpeed or nil
                 }
                 print("[RealismPackage] Vehicle entered critical damage state")
             end
@@ -508,16 +567,7 @@ function DamageLogic:onUpdate(dt)
             -- Restore vehicle to normal when damage drops below 100%
             if self._rpBrokenState ~= nil then
                 print("[RealismPackage] Vehicle restored from critical damage")
-
-                if drivable ~= nil and self._rpBrokenState.speedLimit ~= nil then
-                    drivable.speedLimit = self._rpBrokenState.speedLimit
-                end
-
-                if self.setPowerMultiplier ~= nil then
-                    self:setPowerMultiplier(1, true)
-                end
-
-                self._rpBrokenState = nil
+                restoreCriticalDamageOverrides(self)
             end
 
             -- Graduated penalty (< 100% damage) is handled by AirFilterSystem.applyEngineImpact below
@@ -908,16 +958,5 @@ function DamageLogic.injVehicleShowInfo(vehicle, infoBox)
     infoBox:addLine(labelWear, string.format("%d %%", wearPercent))
     infoBox:addLine(labelAir, string.format("%d %%", airFilterPercent))
 
-    print(string.format("[RealismPackage] injVehicleShowInfo: Wear=%d%% AirFilter=%d%%", wearPercent, airFilterPercent))
+    -- Intentionally avoid per-frame logging here to keep log noise low.
 end
-
-    if Utils ~= nil and type(Utils.appendedFunction) == "function" and DamageLogic and type(DamageLogic.injVehicleShowInfo) == "function" then
-        if Vehicle ~= nil and type(Vehicle.showInfo) == "function" and not Vehicle._rpShowInfoHooked then
-            Vehicle.showInfo = Utils.appendedFunction(Vehicle.showInfo, DamageLogic.injVehicleShowInfo)
-            Vehicle._rpShowInfoHooked = true
-            isVehicleShowInfoHookInstalled = true
-            print("[RealismPackage] Vehicle.showInfo appended with DamageLogic.injVehicleShowInfo.")
-        end
-    else
-        isVehicleShowInfoHookInstalled = false
-    end
