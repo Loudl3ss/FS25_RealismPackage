@@ -15,6 +15,9 @@ RP.DEFAULT_SETTINGS = {
     difficulty = 2
 }
 
+local SETTINGS_XML_ROOT = "realismPackage.settings"
+local SETTINGS_XML_FILENAME = "modSettings/RealismPackage.xml"
+
 local function cloneDefaultSettings()
     return {
         wearEnabled = RP.DEFAULT_SETTINGS.wearEnabled,
@@ -22,6 +25,32 @@ local function cloneDefaultSettings()
         airFilterEnabled = RP.DEFAULT_SETTINGS.airFilterEnabled,
         difficulty = RP.DEFAULT_SETTINGS.difficulty
     }
+end
+
+local function getSettingsFilePath()
+    if type(getUserProfileAppPath) ~= "function" then
+        return nil
+    end
+
+    local userProfilePath = getUserProfileAppPath()
+
+    if type(userProfilePath) ~= "string" or userProfilePath == "" then
+        return nil
+    end
+
+    return userProfilePath .. SETTINGS_XML_FILENAME
+end
+
+local function ensureSettingsDirectoryExists(settingsFilePath)
+    if type(settingsFilePath) ~= "string" or settingsFilePath == "" or type(createFolder) ~= "function" then
+        return
+    end
+
+    local settingsDir = string.match(settingsFilePath, "^(.*)/[^/]+$")
+
+    if settingsDir ~= nil and settingsDir ~= "" then
+        createFolder(settingsDir)
+    end
 end
 
 function RP:ensureSettings()
@@ -60,6 +89,100 @@ function RP:applySettings(profileName, wearEnabled, damageEnabled, airFilterEnab
     end
 
     self:markSettingsDirty()
+end
+
+function RP:loadSettingsFromDisk()
+    local settingsFilePath = getSettingsFilePath()
+
+    if settingsFilePath == nil or type(loadXMLFile) ~= "function" then
+        return false
+    end
+
+    local xmlFile = loadXMLFile("realismPackageSettings", settingsFilePath)
+
+    if xmlFile == nil then
+        return false
+    end
+
+    local loadedWearEnabled = self.DEFAULT_SETTINGS.wearEnabled
+    local loadedDamageEnabled = self.DEFAULT_SETTINGS.damageEnabled
+    local loadedAirFilterEnabled = self.DEFAULT_SETTINGS.airFilterEnabled
+    local loadedDifficulty = self.DEFAULT_SETTINGS.difficulty
+
+    if type(hasXMLProperty) == "function" and hasXMLProperty(xmlFile, SETTINGS_XML_ROOT .. "#wearEnabled") then
+        loadedWearEnabled = getXMLBool(xmlFile, SETTINGS_XML_ROOT .. "#wearEnabled") ~= false
+    end
+
+    if type(hasXMLProperty) == "function" and hasXMLProperty(xmlFile, SETTINGS_XML_ROOT .. "#damageEnabled") then
+        loadedDamageEnabled = getXMLBool(xmlFile, SETTINGS_XML_ROOT .. "#damageEnabled") ~= false
+    end
+
+    if type(hasXMLProperty) == "function" and hasXMLProperty(xmlFile, SETTINGS_XML_ROOT .. "#airFilterEnabled") then
+        loadedAirFilterEnabled = getXMLBool(xmlFile, SETTINGS_XML_ROOT .. "#airFilterEnabled") ~= false
+    end
+
+    if type(hasXMLProperty) == "function" and hasXMLProperty(xmlFile, SETTINGS_XML_ROOT .. "#difficulty") then
+        loadedDifficulty = math.max(1, math.min(3, getXMLInt(xmlFile, SETTINGS_XML_ROOT .. "#difficulty") or self.DEFAULT_SETTINGS.difficulty))
+    end
+
+    if type(delete) == "function" then
+        delete(xmlFile)
+    end
+
+    self:ensureSettings()
+    self.settings.wearEnabled = loadedWearEnabled
+    self.settings.damageEnabled = loadedDamageEnabled
+    self.settings.airFilterEnabled = loadedAirFilterEnabled
+    self.settings.difficulty = loadedDifficulty
+
+    local profileByDifficulty = { "FS25", "NORMAL", "REAL_LIFE" }
+    local profileName = profileByDifficulty[self.settings.difficulty] or "NORMAL"
+
+    if DamageLogic ~= nil and DamageLogic.setProfile ~= nil then
+        DamageLogic.setProfile(DamageLogic, profileName)
+    end
+
+    self.settingsDirty = false
+    return true
+end
+
+function RP:saveSettingsToDisk(force)
+    if not force and self.settingsDirty ~= true then
+        return false
+    end
+
+    local settingsFilePath = getSettingsFilePath()
+
+    if settingsFilePath == nil
+        or type(createXMLFile) ~= "function"
+        or type(saveXMLFile) ~= "function"
+        or type(setXMLBool) ~= "function"
+        or type(setXMLInt) ~= "function" then
+        return false
+    end
+
+    ensureSettingsDirectoryExists(settingsFilePath)
+    self:ensureSettings()
+
+    local xmlFile = createXMLFile("realismPackageSettings", settingsFilePath, SETTINGS_XML_ROOT)
+
+    if xmlFile == nil then
+        return false
+    end
+
+    setXMLBool(xmlFile, SETTINGS_XML_ROOT .. "#wearEnabled", self.settings.wearEnabled ~= false)
+    setXMLBool(xmlFile, SETTINGS_XML_ROOT .. "#damageEnabled", self.settings.damageEnabled ~= false)
+    setXMLBool(xmlFile, SETTINGS_XML_ROOT .. "#airFilterEnabled", self.settings.airFilterEnabled ~= false)
+    setXMLInt(xmlFile, SETTINGS_XML_ROOT .. "#difficulty", math.max(1, math.min(3, self.settings.difficulty or self.DEFAULT_SETTINGS.difficulty)))
+
+    saveXMLFile(xmlFile)
+
+    if type(delete) == "function" then
+        delete(xmlFile)
+    end
+
+    self.settingsDirty = false
+    return true
 end
 
 local function initSpecialization(manager)
@@ -112,9 +235,15 @@ end
 
 function RP:loadMap(_mapFilename)
     self:ensureSettings()
+    self:loadSettingsFromDisk()
+
     if DamageLogic ~= nil and DamageLogic.init ~= nil then
         DamageLogic.init()
     end
+end
+
+function RP:deleteMap()
+    self:saveSettingsToDisk(false)
 end
 
 addModEventListener(RP)
